@@ -1,0 +1,66 @@
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+
+# Replace with your bot token and your Telegram user ID
+BOT_TOKEN = '7674357695:AAGmk7Nyt0_auxddCaoyhIDGwARIWptZ_Sg'
+OWNER_ID = 6161191833  # Your Telegram user ID
+
+# States
+ASK_ITEM, ASK_PAYMENT = range(2)
+
+# Start command
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Hi! What would you like to purchase?")
+    return ASK_ITEM
+
+# Handle item name
+async def get_item(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['item'] = update.message.text
+    reply_keyboard = [["CashApp", "Crypto"]]
+    await update.message.reply_text(
+        "How would you like to pay?",
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+    )
+    return ASK_PAYMENT
+
+# Handle payment and send to owner
+async def get_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    item = context.user_data['item']
+    payment_method = update.message.text
+    user = update.message.from_user
+
+    msg = (
+        f"🛒 New Order:\n"
+        f"👤 User: @{user.username or user.first_name}\n"
+        f"📦 Item: {item}\n"
+        f"💳 Payment Method: {payment_method}"
+    )
+
+    # Send message to bot owner
+    await context.bot.send_message(chat_id=6161191833, text=msg)
+
+    # Confirm to user
+    await update.message.reply_text("Thank you! Your request has been sent.")
+    return ConversationHandler.END
+
+# Cancel command
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Cancelled.")
+    return ConversationHandler.END
+
+# Set up bot
+app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+conv_handler = ConversationHandler(
+    entry_points=[CommandHandler("start", start)],
+    states={
+        ASK_ITEM: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_item)],
+        ASK_PAYMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_payment)],
+    },
+    fallbacks=[CommandHandler("cancel", cancel)]
+)
+
+app.add_handler(conv_handler)
+
+print("Bot is running...")
+app.run_polling()
